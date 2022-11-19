@@ -3,6 +3,7 @@ package com.daphne.zincworks.atm.repo;
 import com.daphne.zincworks.atm.dto.AccountDTO;
 import com.daphne.zincworks.atm.dto.NotesDTO;
 import com.daphne.zincworks.atm.dto.UserDTO;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
