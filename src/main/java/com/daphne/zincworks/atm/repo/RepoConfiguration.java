@@ -22,8 +22,8 @@ public class RepoConfiguration {
     CommandLineRunner initDatabase(UserRepository userRepository, AccountRepository accountRepository, BankRepository bankRepository) {
 
         return args -> {
-            log.info("loading testing data: user" + userRepository.save(new UserDTO("Daphne", "burglar")));
-            log.info("loading testing data: user " + userRepository.save(new UserDTO("Frodo Baggins", "thief")));
+            log.info("loading testing data: user" + userRepository.save(new UserDTO("Carrot")));
+            log.info("loading testing data: user " + userRepository.save(new UserDTO("Apple")));
 
             log.info("loading testing data: account" + accountRepository.save(new AccountDTO(123456789, 1234, 800, 200)));
             log.info("loading testing data: account " + accountRepository.save(new AccountDTO(987654321, 4321, 1230, 150)));
