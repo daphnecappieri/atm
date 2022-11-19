@@ -2,10 +2,15 @@ package com.daphne.zincworks.atm.contoller.v1;
 
 import com.daphne.zincworks.atm.dto.AccountDTO;
 import com.daphne.zincworks.atm.dto.UserDTO;
+import com.daphne.zincworks.atm.exception.InsufficientBalanceException;
 import com.daphne.zincworks.atm.service.ATMService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 @RestController
@@ -17,59 +22,32 @@ public class ATMController {
         this.service = service;
     }
 
-
-    // Aggregate root
-    // tag::get-aggregate-root[]
     @GetMapping("/users")
     List<UserDTO> getAllUsers() {
         return service.findUsers();
     }
-    // end::get-aggregate-root[]
-
 
 
     @GetMapping("/users/balance")
     AccountDTO getBalance(@RequestParam Integer pin) {
         log.info(String.valueOf(pin));
-        return service.getBalance(pin);
+        try {
+            return service.getBalance(pin);
+        } catch (AccessDeniedException exc) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unable to dispense funds. " + exc.getMessage());
+        }
     }
 
     @PutMapping("/users/withdraw")
-    AccountDTO getBalance( @RequestParam Integer pin,@RequestParam Integer amount) {
-        return service.putWithdrawal(pin,amount);
+    ResponseEntity<AccountDTO> getBalance(@RequestParam Integer pin, @RequestParam Integer amount) {
+        try {
+            AccountDTO accountDTO = service.putWithdrawal(pin, amount);
+            return new ResponseEntity<>(accountDTO, HttpStatus.NOT_FOUND);
+        } catch (AccessDeniedException exc) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Incorrect Pin. " + exc.getMessage());
+        } catch (InsufficientBalanceException exc) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Unable to dispense funds. " + exc.getMessage());
+        }
     }
-
-//    @PostMapping("/user")
-//    UserDTO newEmployee(@RequestBody UserDTO newEmployee) {
-//        return service.save(newEmployee);
-//    }
-//
-//    // Single item
-//
-//    @GetMapping("/employees/{id}")
-//    Employee one(@PathVariable Long id) {
-//
-//        return repository.findById(id)
-//                .orElseThrow(() -> new EmployeeNotFoundException(id));
-//    }
-//
-//    @PutMapping("/employees/{id}")
-//    Employee replaceEmployee(@RequestBody Employee newEmployee, @PathVariable Long id) {
-//
-//        return repository.findById(id)
-//                .map(employee -> {
-//                    employee.setName(newEmployee.getName());
-//                    employee.setRole(newEmployee.getRole());
-//                    return repository.save(employee);
-//                })
-//                .orElseGet(() -> {
-//                    newEmployee.setId(id);
-//                    return repository.save(newEmployee);
-//                });
-//    }
-//
-//    @DeleteMapping("/employees/{id}")
-//    void deleteEmployee(@PathVariable Long id) {
-//        repository.deleteById(id);
-//    }
 }

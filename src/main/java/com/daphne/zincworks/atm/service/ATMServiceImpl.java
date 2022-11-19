@@ -3,12 +3,14 @@ package com.daphne.zincworks.atm.service;
 import com.daphne.zincworks.atm.dto.AccountDTO;
 import com.daphne.zincworks.atm.dto.NotesDTO;
 import com.daphne.zincworks.atm.dto.UserDTO;
+import com.daphne.zincworks.atm.exception.InsufficientBalanceException;
 import com.daphne.zincworks.atm.repo.AccountRepository;
 import com.daphne.zincworks.atm.repo.BankRepository;
 import com.daphne.zincworks.atm.repo.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.AccessDeniedException;
 import java.util.*;
 
 @Slf4j
@@ -17,20 +19,12 @@ public class ATMServiceImpl implements ATMService {
 
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
-
     private final BankRepository bankRepository;
 
     ATMServiceImpl(UserRepository userRepository, AccountRepository accountRepository, BankRepository bankRepository) {
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
         this.bankRepository = bankRepository;
-
-
-    }
-
-    @Override
-    public UserDTO findUser(String productId) {
-        return null;
     }
 
     @Override
@@ -39,25 +33,29 @@ public class ATMServiceImpl implements ATMService {
     }
 
     @Override
-    public AccountDTO verifyUser(Integer pin) {
-        return accountRepository.findByPin(pin);
+    public AccountDTO verifyUser(Integer pin) throws AccessDeniedException {
+        AccountDTO accountDTO = accountRepository.findByPin(pin);
+        if (accountDTO == null) {
+            throw new AccessDeniedException(null, null, "pin incorrect");
+        }
+        return accountDTO;
     }
 
     @Override
-    public AccountDTO getBalance(Integer pin) {
-        AccountDTO account = verifyUser(pin);
-        return account;
+    public AccountDTO getBalance(Integer pin) throws AccessDeniedException {
+        return verifyUser(pin);
     }
 
     @Override
-    public AccountDTO putWithdrawal(Integer pin, Integer withdrawalAmount) {
+    public AccountDTO putWithdrawal(Integer pin, Integer withdrawalAmount) throws AccessDeniedException {
         AccountDTO account = verifyUser(pin);
 
         if (withdrawalAmount > availableUserFunds(account.getOpeningBalance(), account.getOverdraft())) {
-            log.error("user does not have funds");
+            throw new InsufficientBalanceException("User does not have the sufficient funds for this request");
         }
         if (withdrawalAmount > availableBankFunds()) {
-            log.error("bank does not have funds");
+            throw new InsufficientBalanceException("Bank does not have the sufficient funds for this request");
+
         }
         newBalance(account, withdrawalAmount);
         accountRepository.save(account);
@@ -86,25 +84,25 @@ public class ATMServiceImpl implements ATMService {
     }
 
     private void newBalance(AccountDTO account, Integer withdrawalAmount) {
-        log.info("newBalance");
 
-//      if there is enough money in OpeningBalance, withdraw.
+//      if there is enough money in users OpeningBalance, withdraw.
         if (account.getOpeningBalance() >= withdrawalAmount) {
             account.setOpeningBalance(account.getOpeningBalance() - withdrawalAmount);
-            log.info("enough in balance");
+            log.debug("withdrawing {} from opening balance", withdrawalAmount);
+
         }
 
 //      if not enough in OpeningBalance, withdraw remainder from overdraft.
         else if (account.getOverdraft() >= withdrawalAmount) {
             int remaining = Math.abs(account.getOpeningBalance() - withdrawalAmount);
+            int openingBalance = account.getOpeningBalance();
             account.setOpeningBalance(0);
             account.setOverdraft(account.getOverdraft() - remaining);
+            log.debug("withdrawing {} from opening balance and {} from overdraft", openingBalance, remaining);
         } else {
-            System.out.println("Error not enough");
-            log.info("Error not enough");
-        }
-        System.out.println(account);
+            throw new InsufficientBalanceException("User does not have the sufficient funds for this request");
 
+        }
     }
 
     private Map<Integer, Integer> notesAmount(Integer withdrawalAmount) {
@@ -113,13 +111,10 @@ public class ATMServiceImpl implements ATMService {
         List<NotesDTO> noteAmounts = bankRepository.findAll();
         NotesDTO notesDTO = noteAmounts.get(0);
         Map<Integer, Integer> bankNotesLimit = notesDTO.getNoteAmount();
-
         Map<Integer, Integer> notesInBank = new TreeMap<>((Collections.reverseOrder()));
-
         notesInBank.putAll(bankNotesLimit);
 
         while (withdrawalAmount > 0) {
-
             for (Map.Entry<Integer, Integer> bank : notesInBank.entrySet()) {
                 int numOfNotes = 0;
                 while (bank.getValue() > 0 && withdrawalAmount > 0 && withdrawalAmount >= bank.getKey()) {
@@ -132,7 +127,6 @@ public class ATMServiceImpl implements ATMService {
                 }
                 dispense.put(bank.getKey(), numOfNotes);
             }
-
         }
         notesDTO.setNoteAmount(bankNotesLimit);
         bankRepository.save(notesDTO);
