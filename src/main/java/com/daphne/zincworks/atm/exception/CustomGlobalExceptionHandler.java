@@ -15,14 +15,18 @@ import java.nio.file.AccessDeniedException;
 @ControllerAdvice
 public class CustomGlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    // Let Spring BasicErrorController handle the exception, we just override the status code
     @ExceptionHandler(InsufficientBalanceException.class)
     public void springHandleNotFound(HttpServletResponse response) throws IOException {
         response.sendError(HttpStatus.NOT_FOUND.value());
     }
 
-    @ExceptionHandler({ AccessDeniedException.class })
+    @ExceptionHandler({AccessDeniedException.class})
     public void handleAccessDeniedException(HttpServletResponse response) throws IOException {
         response.sendError(HttpStatus.FORBIDDEN.value());
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public void springBadRequest(HttpServletResponse response) throws IOException {
+        response.sendError(HttpStatus.BAD_REQUEST.value());
     }
 }
