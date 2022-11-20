@@ -2,7 +2,6 @@ package com.daphne.zincworks.atm.dto;
 
 import lombok.Data;
 
-import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
@@ -11,17 +10,10 @@ import javax.persistence.Id;
 @Entity
 public class AccountDTO {
 
-    private
-    @Id
-    @GeneratedValue
-//    @Column(name="Account Number")
-    int accountNumber;
-//    @Column(name="PIN")
+    private @Id
+    @GeneratedValue int accountNumber;
     private int pin;
-//    @Column(name="Opening Balance")
     private int openingBalance;
-//    @Column(name="Overdraft")
-
     private int overdraft;
 
     public AccountDTO() {

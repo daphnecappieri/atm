@@ -86,10 +86,15 @@ public class ATMServiceImpl implements ATMService {
         return open + overdraft;
     }
 
-    private int availableBankFunds() {
+    private int availableBankFunds(Integer withdrawalAmount) {
 
         List<NotesDTO> noteAmounts = bankRepository.findAll();
         Map<Integer, Integer> notes = noteAmounts.get(0).getNoteAmount();
+
+        Integer smallestDenomination = Collections.min(notes.keySet());
+        if (withdrawalAmount % smallestDenomination > 0) {
+            throw new BadRequestException("Withdrawal requests should be in multiples of " + smallestDenomination);
+        }
 
         List<Integer> bankTotal = notes.entrySet().stream()
                 .map(e -> e.getValue() * e.getKey()).toList();
