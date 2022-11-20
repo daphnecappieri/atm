@@ -14,14 +14,13 @@ public class UserDTO {
     private @Id
     @GeneratedValue Long id;
     private String name;
-    private String role;
+
 
     public UserDTO() {
     }
 
-    public UserDTO(String name, String role) {
+    public UserDTO(String name) {
         this.name = name;
-        this.role = role;
     }
 
 

@@ -3,6 +3,7 @@ package com.daphne.zincworks.atm.contoller.v1;
 import com.daphne.zincworks.atm.dto.AccountDTO;
 import com.daphne.zincworks.atm.dto.UserDTO;
 import com.daphne.zincworks.atm.exception.InsufficientBalanceException;
+import com.daphne.zincworks.atm.model.AccountInfo;
 import com.daphne.zincworks.atm.service.ATMService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,7 @@ public class ATMController {
 
 
     @GetMapping("/users/balance")
-    AccountDTO getBalance(@RequestParam Integer pin) {
+    AccountInfo getBalance(@RequestParam Integer pin) {
         log.info(String.valueOf(pin));
         try {
             return service.getBalance(pin);
@@ -39,9 +40,9 @@ public class ATMController {
     }
 
     @PutMapping("/users/withdraw")
-    ResponseEntity<AccountDTO> getBalance(@RequestParam Integer pin, @RequestParam Integer amount) {
+    ResponseEntity<AccountInfo> getBalance(@RequestParam Integer pin, @RequestParam Integer amount) {
         try {
-            AccountDTO accountDTO = service.putWithdrawal(pin, amount);
+            AccountInfo accountDTO = service.putWithdrawal(pin, amount);
             return new ResponseEntity<>(accountDTO, HttpStatus.NOT_FOUND);
         } catch (AccessDeniedException exc) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Incorrect Pin. " + exc.getMessage());
