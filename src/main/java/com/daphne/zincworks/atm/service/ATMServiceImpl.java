@@ -2,12 +2,11 @@ package com.daphne.zincworks.atm.service;
 
 import com.daphne.zincworks.atm.dto.AccountDTO;
 import com.daphne.zincworks.atm.dto.NotesDTO;
-import com.daphne.zincworks.atm.dto.UserDTO;
+import com.daphne.zincworks.atm.exception.BadRequestException;
 import com.daphne.zincworks.atm.exception.InsufficientBalanceException;
 import com.daphne.zincworks.atm.model.AccountInfo;
 import com.daphne.zincworks.atm.repo.AccountRepository;
 import com.daphne.zincworks.atm.repo.BankRepository;
-import com.daphne.zincworks.atm.repo.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -18,19 +17,12 @@ import java.util.*;
 @Service
 public class ATMServiceImpl implements ATMService {
 
-    private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final BankRepository bankRepository;
 
-    ATMServiceImpl(UserRepository userRepository, AccountRepository accountRepository, BankRepository bankRepository) {
-        this.userRepository = userRepository;
+    ATMServiceImpl(AccountRepository accountRepository, BankRepository bankRepository) {
         this.accountRepository = accountRepository;
         this.bankRepository = bankRepository;
-    }
-
-    @Override
-    public List<UserDTO> findUsers() {
-        return userRepository.findAll();
     }
 
     @Override
@@ -39,11 +31,6 @@ public class ATMServiceImpl implements ATMService {
         if (accountDTO == null) {
             throw new AccessDeniedException(null, null, "pin incorrect");
         }
-//        AccountInfo accountInfo = new AccountInfo();
-//        accountInfo.setAccountNumber(accountDTO.getAccountNumber());
-//        accountInfo.setOpeningBalance(accountDTO.setOpeningBalance();
-//        accountInfo.setOverdraft(accountDTO.getOverdraft());
-
         return accountDTO;
     }
 
@@ -52,32 +39,33 @@ public class ATMServiceImpl implements ATMService {
         AccountDTO accountDTO = verifyUser(pin);
         AccountInfo accountInfo = new AccountInfo();
         accountInfo.setAccountNumber(accountDTO.getAccountNumber());
-        accountInfo.setOpeningBalance(accountDTO.getAccountNumber());
+        accountInfo.setOpeningBalance(accountDTO.getOpeningBalance());
         accountInfo.setOverdraft(accountDTO.getOverdraft());
+        accountInfo.setMaxWithdrawal(accountDTO.getOpeningBalance() + accountDTO.getOverdraft());
+
         return accountInfo;
     }
 
     @Override
-    public AccountInfo putWithdrawal(Integer pin, Integer withdrawalAmount) throws AccessDeniedException {
-        AccountDTO account = verifyUser(pin);
+    public AccountInfo withdrawal(Integer pin, Integer withdrawalAmount) throws AccessDeniedException {
+        AccountDTO userAccount = verifyUser(pin);
 
-        if (withdrawalAmount > availableUserFunds(account.getOpeningBalance(), account.getOverdraft())) {
+        if (withdrawalAmount > availableUserFunds(userAccount.getOpeningBalance(), userAccount.getOverdraft())) {
             throw new InsufficientBalanceException("User does not have the sufficient funds for this request");
         }
-        if (withdrawalAmount > availableBankFunds()) {
+        if (withdrawalAmount > availableBankFunds(withdrawalAmount)) {
             throw new InsufficientBalanceException("Bank does not have the sufficient funds for this request");
-
         }
-        updateBalance(account, withdrawalAmount);
-        accountRepository.save(account);
-        Map<Integer, Integer> notesToDispense = notesAmount(withdrawalAmount);
+        updateBalance(userAccount, withdrawalAmount);
+        Map<Integer, Integer> dispensedNotes = notesToDependence(withdrawalAmount);
+        accountRepository.save(userAccount);
 
         AccountInfo accountInfo = new AccountInfo();
-        accountInfo.setAccountNumber(account.getAccountNumber());
-        accountInfo.setOpeningBalance(account.getOpeningBalance());
-        accountInfo.setOverdraft(account.getOverdraft());
-        accountInfo.setNotesToDispense(notesToDispense);
-        log.debug("user account: {} ", accountInfo);
+        accountInfo.setAccountNumber(userAccount.getAccountNumber());
+        accountInfo.setOpeningBalance(userAccount.getOpeningBalance());
+        accountInfo.setOverdraft(userAccount.getOverdraft());
+        accountInfo.setNotesToDispense(dispensedNotes);
+        accountInfo.setMaxWithdrawal(userAccount.getOpeningBalance() + userAccount.getOverdraft());
 
         return accountInfo;
     }
@@ -110,7 +98,7 @@ public class ATMServiceImpl implements ATMService {
         }
 
 //      if not enough in OpeningBalance, withdraw remainder from overdraft.
-        else if (account.getOverdraft() >= withdrawalAmount) {
+        else if (account.getOpeningBalance() + account.getOverdraft() >= withdrawalAmount) {
             int remaining = Math.abs(account.getOpeningBalance() - withdrawalAmount);
             int openingBalance = account.getOpeningBalance();
             account.setOpeningBalance(0);
@@ -118,19 +106,21 @@ public class ATMServiceImpl implements ATMService {
             log.debug("withdrawing {} from opening balance and {} from overdraft", openingBalance, remaining);
         } else {
             throw new InsufficientBalanceException("User does not have the sufficient funds for this request");
-
         }
     }
 
-    private Map<Integer, Integer> notesAmount(Integer withdrawalAmount) {
+    private Map<Integer, Integer> notesToDependence(Integer withdrawalAmount) {
 
         Map<Integer, Integer> dispense = new HashMap<>();
-        List<NotesDTO> noteAmounts = bankRepository.findAll();
-        NotesDTO notesDTO = noteAmounts.get(0);
+        NotesDTO notesDTO = bankRepository.findAll().get(0);
+
         Map<Integer, Integer> bankNotesLimit = notesDTO.getNoteAmount();
+        //Add banknotes to TreeMap to allow sorting
         Map<Integer, Integer> notesInBank = new TreeMap<>((Collections.reverseOrder()));
         notesInBank.putAll(bankNotesLimit);
 
+//       while there is still remaining withdrawal amount, loop through notesInBank and subtract
+//       note amount from withdrawal amount, starting from the largest denomination.
         while (withdrawalAmount > 0) {
             for (Map.Entry<Integer, Integer> bank : notesInBank.entrySet()) {
                 int numOfNotes = 0;
@@ -138,16 +128,15 @@ public class ATMServiceImpl implements ATMService {
                     withdrawalAmount = withdrawalAmount - bank.getKey();
                     bank.setValue(bank.getValue() - 1);
                     numOfNotes++;
-                    int key = bank.getKey();
-                    int value = bank.getValue();
-                    bankNotesLimit.put(key, value);
+
+                    bankNotesLimit.put(bank.getKey(), bank.getValue());
                 }
                 dispense.put(bank.getKey(), numOfNotes);
             }
         }
+        // update banknote amounts in database
         notesDTO.setNoteAmount(bankNotesLimit);
         bankRepository.save(notesDTO);
         return dispense;
     }
 }
-
