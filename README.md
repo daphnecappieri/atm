@@ -38,4 +38,4 @@ curl --location --request PUT 'localhost:8080/user/withdraw?pin=1234&amount=685'
 ```
 
 ### Config
-Test data is loaded into the database in through the RepoConfiguration class under: com.daphne.zincworks.atm.repo;
+Test data is loaded into the h2 database in through the RepoConfiguration class under: com.daphne.zincworks.atm.repo;
